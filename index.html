@@ -21,6 +21,9 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
 .latest { text-align:center; font-size:14px; line-height:1.6; }
 .badge { display:inline-block; padding:1px 8px; border-radius:8px; font-size:12px; }
 .badge.g { background:rgba(63,185,80,.15); color:var(--green); }
+.badge.r { background:rgba(248,81,73,.15); color:var(--red); }
+.stats-box { font-family:ui-monospace,Menlo,monospace; font-size:13px; line-height:1.9; color:var(--fg); }
+.stats-box .num { color:var(--blue); font-weight:bold; }
 </style>
 </head>
 <body>
@@ -38,6 +41,18 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
   <div class="row"><span class="k">🎯 推荐特码</span><span class="v hit" id="p-tema">--</span></div>
 </div>
 
+<!-- 历史验证卡片 -->
+<div class="card" id="verify-card" style="display:none; text-align:center; font-size:14px;">
+  <h2 style="text-align:left;">📊 上期验证</h2>
+  <div id="verify-content" style="margin-top:10px;"></div>
+</div>
+
+<!-- 胜率统计卡片 -->
+<div class="card stats-box" id="stats-card">
+  <h2>📈 本次盲测战绩</h2>
+  <div id="stats-content">战绩计算中，请等待云端运行一次...</div>
+</div>
+
 <div class="card" style="text-align:center; padding:10px;">
   <button onclick="loadData()" style="padding:8px 20px; border-radius:8px; border:1px solid var(--border); background:#21262d; color:var(--fg); font-size:14px;">🔄 刷新数据</button>
 </div>
@@ -45,18 +60,17 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
 <script>
 async function loadData(){
   const statusEl = document.getElementById('status');
-  statusEl.textContent = '正在拉取最新预测…';
+  statusEl.textContent = '正在拉取最新数据…';
   try {
-    // 加个时间戳防止浏览器缓存
     const res = await fetch('data.json?t=' + Date.now()); 
     const data = await res.json();
     
-    // 渲染最新开奖
+    // 1. 最新开奖
     const l = data.latest;
     document.getElementById('latest').innerHTML = 
       `🎲 最新开奖: <b>${l.period}</b> 期 &nbsp; ${l.nums.join(' + ')} = <b>${l.sum}</b> &nbsp; <span class="badge g">[${l.type}]</span>`;
     
-    // 渲染预测
+    // 2. 下期预测
     const p = data.prediction;
     if (p) {
       document.getElementById('p-period').textContent = data.next_period + ' 期';
@@ -64,8 +78,32 @@ async function loadData(){
       document.getElementById('p-main').textContent = p.main.join(' , ');
       document.getElementById('p-def').textContent = p.defense;
       document.getElementById('p-tema').textContent = p.temas.map(c=>String(c).padStart(2,'0')).join('  ');
-      statusEl.textContent = '✅ 已获取云端最新数据';
     }
+
+    // 3. 上期验证
+    const v = data.last_verify;
+    if (v && v.actual) {
+      document.getElementById('verify-card').style.display = 'block';
+      const isHit = v.mainHit || v.defHit;
+      const hitHtml = isHit ? '<span style="color:var(--green)">✅ 命中</span>' : '<span style="color:var(--red)">❌ 未中</span>';
+      document.getElementById('verify-content').innerHTML = 
+        `实际: <b>${v.actual}</b> | 双组/防守: ${hitHtml}`;
+    }
+
+    // 4. 统计胜率
+    const s = data.stats;
+    if (s && s.total > 0) {
+      document.getElementById('stats-content').innerHTML = 
+        `总期数: <span class="num">${s.total}</span> | 双组中: <span class="num">${s.main}</span> | 防守中: <span class="num">${s.def}</span> | 特码中: <span class="num">${s.tema}</span><br>` +
+        `<span style="color:var(--dim)">----------------------------------------</span><br>` +
+        `双组命中率: <b style="color:var(--green)">${(s.main/s.total*100).toFixed(1)}%</b> | ` +
+        `防守命中率: <b style="color:var(--green)">${(s.def/s.total*100).toFixed(1)}%</b> | ` +
+        `特码命中率: <b style="color:var(--green)">${(s.tema/s.total*100).toFixed(1)}%</b>`;
+    } else {
+      document.getElementById('stats-content').textContent = '暂无已验证的历史记录，等待下期开奖...';
+    }
+
+    statusEl.textContent = '✅ 已获取云端最新数据';
   } catch (e) {
     statusEl.textContent = '⚠️ 云端数据还没生成，请稍等或点击刷新';
   }
