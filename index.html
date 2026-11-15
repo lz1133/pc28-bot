@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0d1117">
-<title>深1.0 · 云端版</title>
+<title>深1.0 · 实时版</title>
 <style>
 :root { --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --dim:#8b949e; --blue:#58a6ff; --green:#3fb950; --red:#f85149; --border:#30363d; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -18,7 +18,7 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
 .row .k { color:var(--dim); }
 .row .v { font-weight:bold; }
 .v.kill { color:var(--red); } .v.hit { color:var(--green); }
-.latest { text-align:center; font-size:14px; line-height:1.6; }
+.latest { text-align:center; font-size:15px; line-height:1.6; }
 .badge { display:inline-block; padding:1px 8px; border-radius:8px; font-size:12px; }
 .badge.g { background:rgba(63,185,80,.15); color:var(--green); }
 .badge.r { background:rgba(248,81,73,.15); color:var(--red); }
@@ -27,14 +27,16 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
 </style>
 </head>
 <body>
-<h1>🌌 深1.0 · 云端版</h1>
-<div class="status" id="status">正在加载云端数据…</div>
+<h1>🌌 深1.0 · 实时版</h1>
+<div class="status" id="status">正在连接云端...</div>
 
-<div class="card latest" id="latest">等待数据…</div>
-<div id="live-info" style="text-align:center; font-size:13px; color:var(--dim); margin-top:-8px; margin-bottom:12px;"></div>
+<!-- 实时开奖区 -->
+<div class="card latest" id="latest-box">等待官方开奖数据...</div>
+<div id="live-info" style="text-align:center; font-size:13px; color:var(--blue); margin-top:-8px; margin-bottom:12px; font-weight:bold;"></div>
 
+<!-- 预测区 -->
 <div class="card">
-  <h2>🎯 下期预测</h2>
+  <h2>🎯 下期预测 (云端生成)</h2>
   <div class="row"><span class="k">预测期号</span><span class="v" id="p-period">--</span></div>
   <div class="row"><span class="k">❌ 杀 (不买)</span><span class="v kill" id="p-kill">--</span></div>
   <div class="row"><span class="k">✅ 双组推荐</span><span class="v hit" id="p-main">--</span></div>
@@ -54,33 +56,27 @@ h2 { font-size:15px; color:var(--blue); margin-bottom:10px; border-left:3px soli
   <div id="stats-content">战绩计算中，请等待云端运行一次...</div>
 </div>
 
-<div class="card" style="text-align:center; padding:10px;">
-  <button onclick="loadData()" style="padding:8px 20px; border-radius:8px; border:1px solid var(--border); background:#21262d; color:var(--fg); font-size:14px;">🔄 刷新数据</button>
-</div>
-
 <script>
-// 1. 加载云端预测数据
-async function loadData(){
-  const statusEl = document.getElementById('status');
-  statusEl.textContent = '正在拉取最新预测…';
+// 1. 获取云端数据 (预测与战绩)
+let cloudData = null;
+async function loadCloudData(){
   try {
     const res = await fetch('data.json?t=' + Date.now()); 
-    const data = await res.json();
+    cloudData = await res.json();
+    document.getElementById('status').textContent = '✅ 已连接云端';
     
-    const l = data.latest;
-    document.getElementById('latest').innerHTML = 
-      `🎲 最新开奖: <b>${l.period}</b> 期 &nbsp; ${l.nums.join(' + ')} = <b>${l.sum}</b> &nbsp; <span class="badge g">[${l.type}]</span>`;
-    
-    const p = data.prediction;
+    // 渲染预测
+    const p = cloudData.prediction;
     if (p) {
-      document.getElementById('p-period').textContent = data.next_period + ' 期';
+      document.getElementById('p-period').textContent = cloudData.next_period + ' 期';
       document.getElementById('p-kill').textContent = p.kill;
       document.getElementById('p-main').textContent = p.main.join(' , ');
       document.getElementById('p-def').textContent = p.defense;
       document.getElementById('p-tema').textContent = p.temas.map(c=>String(c).padStart(2,'0')).join('  ');
     }
 
-    const v = data.last_verify;
+    // 渲染上期验证
+    const v = cloudData.last_verify;
     if (v && v.actual) {
       document.getElementById('verify-card').style.display = 'block';
       const isHit = v.mainHit || v.defHit;
@@ -88,7 +84,8 @@ async function loadData(){
       document.getElementById('verify-content').innerHTML = `实际: <b>${v.actual}</b> | 双组/防守: ${hitHtml}`;
     }
 
-    const s = data.stats;
+    // 渲染战绩
+    const s = cloudData.stats;
     if (s && s.total > 0) {
       document.getElementById('stats-content').innerHTML = 
         `总期数: <span class="num">${s.total}</span> | 双组中: <span class="num">${s.main}</span> | 防守中: <span class="num">${s.def}</span> | 特码中: <span class="num">${s.tema}</span><br>` +
@@ -96,34 +93,44 @@ async function loadData(){
         `双组命中率: <b style="color:var(--green)">${(s.main/s.total*100).toFixed(1)}%</b> | ` +
         `防守命中率: <b style="color:var(--green)">${(s.def/s.total*100).toFixed(1)}%</b> | ` +
         `特码命中率: <b style="color:var(--green)">${(s.tema/s.total*100).toFixed(1)}%</b>`;
-    } else {
-      document.getElementById('stats-content').textContent = '暂无已验证的历史记录，等待下期开奖...';
     }
-    statusEl.textContent = '✅ 已获取云端最新数据';
   } catch (e) {
-    statusEl.textContent = '⚠️ 云端数据还没生成，请稍等或点击刷新';
+    document.getElementById('status').textContent = '⚠️ 云端数据未生成，稍后自动重试...';
   }
 }
 
-// 2. 实时开奖倒计时 (每3秒抓取一次)
+// 2. 实时抓取官网开奖和倒计时 (每3秒)
 async function fetchLiveData(){
   try {
     const res = await fetch('https://pc28.help/api/kj.json?nbr=1&_=' + Date.now());
     const data = await res.json();
     if(data.message === 'success' && data.data.length > 0){
+      const latest = data.data[0];
+      const nums = latest.number.split('+').map(Number);
+      const sum = nums.reduce((a,b)=>a+b,0);
+      const type = (sum>=14?'大':'小')+(sum%2?'单':'双');
+      const badgeClass = type[0]==='大' ? 'r' : 'g';
       const cd = Array.isArray(data.countdown) ? data.countdown[0] : data.countdown;
-      document.getElementById('live-info').innerHTML = 
-        `⚡ 实时监控中 | 下期倒计时: <span style="color:var(--blue);font-weight:bold">${cd}</span> 秒`;
+      
+      // 渲染实时开奖
+      document.getElementById('latest-box').innerHTML = 
+        `🎲 最新开奖: <b>${latest.nbr}</b> 期<br><span style="font-size:18px; color:var(--blue)">${latest.number} = ${sum}</span> <span class="badge ${badgeClass}">[${type}]</span>`;
+      
+      // 渲染倒计时
+      document.getElementById('live-info').innerHTML = `⚡ 距下期开奖: <span style="color:var(--red); font-size:15px;">${cd}</span> 秒`;
     }
   } catch(e) {
-    // 如果接口不让跨域读，就静默失败
+    console.log('实时接口请求失败');
   }
 }
 
 // 启动
-loadData();
+loadCloudData();
 fetchLiveData();
-setInterval(fetchLiveData, 3000); // 每3秒更新倒计时
+
+// 设置循环：实时开奖每3秒抓一次，云端预测每30秒同步一次
+setInterval(fetchLiveData, 3000); 
+setInterval(loadCloudData, 30000); 
 </script>
 </body>
 </html>
