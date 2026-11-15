@@ -11,6 +11,7 @@ TEMA_POOL = {
     "小双": [0, 2, 4, 6, 8, 10, 12], "小单": [1, 3, 5, 7, 9, 11, 13],
     "大双": [14, 16, 18, 20, 22, 24, 26], "大单": [15, 17, 19, 21, 23, 25, 27]
 }
+STATE_FILE = 'state.json'
 
 def get_7_0_prediction(history):
     if len(history) < 30: return None
@@ -48,20 +49,21 @@ def fetch_data():
     with urllib.request.urlopen(req, timeout=20) as response:
         return json.loads(response.read().decode('utf-8'))
 
+def load_state():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, 'r') as f: return json.load(f)
+    return {"preds": {}}
+
 def main():
     data = None
-    # 增加3次重试，防止云端网络偶尔抽风
     for i in range(3):
         try:
             data = fetch_data()
             break
-        except Exception as e:
-            print(f"抓取失败, 重试中 ({i+1}/3)... 错误: {e}")
+        except Exception:
             time.sleep(3)
             
-    if not data or 'data' not in data:
-        print("彻底无法获取数据，退出")
-        return
+    if not data or 'data' not in data: return
         
     records = []
     for row in data['data']:
@@ -75,19 +77,46 @@ def main():
     
     latest = records[-1]
     next_period = str(int(latest['period']) + 1)
-    res = get_7_0_prediction(records)
+    state = load_state()
     
+    # 验证之前的预测
+    for r in records:
+        p = state['preds'].get(r['period'])
+        if p and p.get('actual') is None:
+            p['actual'] = r['type']
+            p['mainHit'] = 1 if r['type'] in p['main'] else 0
+            p['defHit'] = 1 if r['type'] == p['defense'] else 0
+            p['temaHit'] = 1 if r['sum'] in p['temas'] else 0
+            
+    # 统计胜率
+    done = [p for p in state['preds'].values() if p.get('actual') is not None]
+    stats = {"total": len(done), "main": 0, "def": 0, "tema": 0}
+    for p in done:
+        stats['main'] += p['mainHit']
+        stats['def'] += p['defHit']
+        stats['tema'] += p['temaHit']
+    
+    # 生成新预测
+    res = get_7_0_prediction(records)
+    if res and next_period not in state['preds']:
+        state['preds'][next_period] = {
+            "kill": res[0], "main": res[1], "defense": res[2], "temas": res[3]
+        }
+        
+    with open(STATE_FILE, 'w') as f:
+        json.dump(state, f)
+        
+    # 把结果打包给网页
     output = {
         "latest": latest,
         "next_period": next_period,
-        "prediction": {
-            "kill": res[0], "main": res[1], "defense": res[2], "temas": res[3]
-        } if res else None
+        "prediction": state['preds'].get(next_period),
+        "stats": stats,
+        "last_verify": state['preds'].get(latest['period'])
     }
     
     with open('data.json', 'w') as f:
         json.dump(output, f, ensure_ascii=False)
-    print("数据生成成功！")
 
 if __name__ == '__main__':
     main()
