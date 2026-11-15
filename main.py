@@ -1,6 +1,8 @@
 import urllib.request
 import json
 import random
+import time
+import os
 from collections import defaultdict
 
 API_URL = "https://pc28.help/api/kj.json?nbr=300"
@@ -41,11 +43,26 @@ def get_7_0_prediction(history):
     temas = random.sample(core_pool, min(4, len(core_pool)))
     return kill, main_bets, defense, sorted(temas)
 
-def main():
+def fetch_data():
     req = urllib.request.Request(API_URL, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=15) as response:
-        data = json.loads(response.read().decode('utf-8'))
-    
+    with urllib.request.urlopen(req, timeout=20) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+def main():
+    data = None
+    # 增加3次重试，防止云端网络偶尔抽风
+    for i in range(3):
+        try:
+            data = fetch_data()
+            break
+        except Exception as e:
+            print(f"抓取失败, 重试中 ({i+1}/3)... 错误: {e}")
+            time.sleep(3)
+            
+    if not data or 'data' not in data:
+        print("彻底无法获取数据，退出")
+        return
+        
     records = []
     for row in data['data']:
         nums = [int(x) for x in row['number'].split('+')]
@@ -70,6 +87,7 @@ def main():
     
     with open('data.json', 'w') as f:
         json.dump(output, f, ensure_ascii=False)
+    print("数据生成成功！")
 
 if __name__ == '__main__':
     main()
