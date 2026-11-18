@@ -1,1 +1,1 @@
-{"latest": {"period": "3507890", "nums": [2, 3, 9], "sum": 14, "type": "大双"}, "next_period": "3507891", "prediction": {"kill": "大双", "main": ["小单", "小双"], "defense": "大单", "temas": [9, 11, 12, 17]}, "stats": {"total": 71, "main": 41, "def": 15, "tema": 18}, "last_verify": null}
+{"latest": {"period": "3507907", "nums": [6, 2, 7], "sum": 15, "type": "大单"}, "next_period": "3507908", "prediction": {"kill": "大单", "main": ["大双", "小单"], "defense": "小双", "temas": [9, 12, 16, 18]}, "stats": {"total": 72, "main": 41, "def": 15, "tema": 18}, "last_verify": null}
